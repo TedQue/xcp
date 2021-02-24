@@ -8,4 +8,7 @@ TAGS:
 	ctags -R .
 
 install: xcp
-	./xcp -v ./xcp /usr/local/bin/
+	./xcp -vf ./xcp /usr/local/bin/
+
+uninstall:
+	-rm /usr/local/bin/xcp

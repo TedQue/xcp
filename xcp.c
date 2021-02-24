@@ -50,6 +50,11 @@
 * v0.3 添加覆盖时 yes/no to all 选项
 * v0.3.1 细节修订
 * v0.3.2 细节修订
+* v0.3.3 代码格式修订
+*
+* 2020-01-16
+* v0.3.4 只在扫描阶段提示 -r 选项 
+* 取消 dry_run() 合并入 copy()
 */
 
 #define MAX_FMTSTR_LENGTH			2048/*传递给print_message函数的格式字符串最大长度*/
@@ -101,7 +106,8 @@ char g_copy_buf[COPY_BUF_SIZE];
 int g_auto_choice = 0;
 
 /*显示为可读数字*/
-static char *human_size(long long s, char *hs) {
+static char *human_size(long long s, char *hs)
+{
 	if (s >= GBYTES) {
 		sprintf(hs, "%.2fGB", (s * 1.0) / GBYTES);
 	} else if (s >= 1024 * 1024) {
@@ -115,7 +121,8 @@ static char *human_size(long long s, char *hs) {
 }
 
 /* human readable time */
-static char *human_time(time_t t, char *text) {
+static char *human_time(time_t t, char *text)
+{
 	int h, m, s;
 	h = (int)(t / HOUR);
 	m = (int)((t % HOUR) / MINUTE);
@@ -136,7 +143,8 @@ static char *human_time(time_t t, char *text) {
 * 1. 状态文字总是在当前行输出不换行
 * 2. printerror只能在状态文字被显示之后输出，即定时器被安装之后使用。
 */
-static void print_message(int t, const char *fmt, ...) {
+static void print_message(int t, const char *fmt, ...)
+{
 	char real_fmt[MAX_FMTSTR_LENGTH];
 	va_list args;
 
@@ -149,7 +157,8 @@ static void print_message(int t, const char *fmt, ...) {
 }
 
 /*显示进度条*/
-static void show_status(int finish) {
+static void show_status(int finish)
+{
 	static char s_animate[4] = {"-/|\\"};
 	static int s_animate_pos = 0;
 	int percent,i;
@@ -189,14 +198,16 @@ static void show_status(int finish) {
 }
 
 /*定时器处理函数*/
-static void timer_handler(int signum) {
+static void timer_handler(int signum)
+{
 	if (!g_status_pause) {
 		show_status(0);
 	}
 }
 
 /*安装/删除定时器*/
-static void install_timer(size_t sec, sig_handler_t handler_func) {
+static void install_timer(size_t sec, sig_handler_t handler_func)
+{
 	struct sigaction act;
 	struct itimerval tick;
 
@@ -218,7 +229,8 @@ static void install_timer(size_t sec, sig_handler_t handler_func) {
 	setitimer(ITIMER_REAL, &tick, 0);
 }
 
-static char *step_in_path(char *p, const char *sub) {
+static char *step_in_path(char *p, const char *sub)
+{
 	if (p[strlen(p) - 1] == '/') {
 		strcat(p, sub);
 	} else {
@@ -257,7 +269,8 @@ static char *get_last_item(char *p)
 * 遍历函数只保证源文件/文件夹的每一项都调用一次op函数
 * 由op函数的返回值决定是否继续扫描
 */
-static int walk(int depth, char* src, char* dest, op_func_t op) {
+static int walk(int depth, char* src, char* dest, op_func_t op)
+{
 	struct stat src_st = {};
 	struct stat dest_st = {};
 	int src_errno = 0;
@@ -296,7 +309,6 @@ static int walk(int depth, char* src, char* dest, op_func_t op) {
 
 	/* 源是一个文件 */
 	if (!S_ISDIR(src_st.st_mode)) {
-
 		if (!dest_errno && S_ISDIR(dest_st.st_mode)) {
 			/* 目标是一个已存在的目录 */
 			print_message(MSGT_ERROR, "can't write \"%s\", is a existing directory\n", dest);
@@ -311,10 +323,7 @@ static int walk(int depth, char* src, char* dest, op_func_t op) {
 	/* 源是一个目录 */
 	if (dest_errno || S_ISDIR(dest_st.st_mode)) {
 		/* 目标不存在或是一个目录 */
-		if (!g_opt_r) {
-			print_message(MSGT_ERROR, "skip directory \"%s\", -r not specified\n", src);
-			ret_val = OP_SKIP;
-		} else if ((ret_val = op(src, dest, &src_st, (dest_errno ? NULL : &dest_st))) != OP_CONTINUE) {
+		if ((ret_val = op(src, dest, &src_st, (dest_errno ? NULL : &dest_st))) != OP_CONTINUE) {
 			/* skip or cancel */
 		} else {
 			/* 目录: 递归浏览 */
@@ -346,24 +355,18 @@ static int walk(int depth, char* src, char* dest, op_func_t op) {
 }
 
 /* 统计函数 */
-static int sum_up(const char* src, const char* dest, const struct stat *src_st, const struct stat* dest_st) {
+static int sum_up(const char* src, const char* dest, const struct stat *src_st, const struct stat* dest_st)
+{
 	if (S_ISREG(src_st->st_mode)) {
 		g_sum_file++;
 		g_sum_size += src_st->st_size;
 	} else if (S_ISDIR(src_st->st_mode)) {
-		g_sum_dir++;
-	} else {
-		print_message(MSGT_WARNING, "skip \"%s\"\n", src);
-	}
-	return OP_CONTINUE;
-}
-
-/*dry run*/
-static int dry_run(const char* src, const char* dest, const struct stat *src_st, const struct stat* dest_st) {
-	if (S_ISREG(src_st->st_mode)) {
-		print_message(MSGT_VERBOSE, "cp \"%s\" -> \"%s\"\n", src, dest);
-	} else if (S_ISDIR(src_st->st_mode)) {
-		print_message(MSGT_VERBOSE, "mkdir \"%s\"\n", dest);
+		if (g_opt_r) {
+			g_sum_dir++;
+		} else {
+			print_message(MSGT_WARNING, "skip directory \"%s\", -r not specified\n", src);
+			return OP_SKIP;
+		}
 	} else {
 		print_message(MSGT_WARNING, "skip \"%s\"\n", src);
 	}
@@ -412,7 +415,8 @@ static int get_user_choice(const char *dest)
 }
 
 /* 实际操作 */
-static int copy(const char* src, const char* dest, const struct stat *src_st, const struct stat *dest_st) {
+static int copy(const char* src, const char* dest, const struct stat *src_st, const struct stat *dest_st)
+{
 	int ret_val = OP_CONTINUE;
 	size_t rd, wr, swr;
 	FILE *src_file, *dest_file;
@@ -422,6 +426,8 @@ static int copy(const char* src, const char* dest, const struct stat *src_st, co
 	if (S_ISREG(src_st->st_mode)) {
 		/* regular file */
 		print_message(MSGT_VERBOSE, "cp \"%s\" -> \"%s\"\n", src, dest);
+
+		if (g_opt_d) return OP_CONTINUE;
 
 		/*询问是否可以覆盖*/
 		if (!g_opt_f && dest_st) {
@@ -468,15 +474,21 @@ static int copy(const char* src, const char* dest, const struct stat *src_st, co
 		}
 	}
 	else if (S_ISDIR(src_st->st_mode)) {
-		/* directories */
-		print_message(MSGT_VERBOSE, "mkdir \"%s\"\n", dest);
+		if (g_opt_r) {
+			/* directories */
+			print_message(MSGT_VERBOSE, "mkdir \"%s\"\n", dest);
 
-		ret_mkdir = mkdir(dest, src_st->st_mode);
-		if (!ret_mkdir || (ret_mkdir == -1 && errno == EEXIST)) {
-			g_copied_dir++;
+			if (g_opt_d) return OP_CONTINUE;
+
+			ret_mkdir = mkdir(dest, src_st->st_mode);
+			if (!ret_mkdir || (ret_mkdir == -1 && errno == EEXIST)) {
+				g_copied_dir++;
+			} else {
+				ret_val = OP_SKIP;
+				print_message(MSGT_ERROR, "skip, \"%s\" mkdir failed\n", dest);
+			}
 		} else {
 			ret_val = OP_SKIP;
-			print_message(MSGT_ERROR, "skip, \"%s\" mkdir failed\n", dest);
 		}
 	} else {
 		/* not file nor directory */
@@ -488,23 +500,26 @@ static int copy(const char* src, const char* dest, const struct stat *src_st, co
 }
 
 /*使用说明*/
-static void usage() {
-	printf("xcp v0.3.2 - by Q++ Studio 2020-01-11\n");
-	printf("description:cp with progress\n");
+static void usage()
+{
+	printf("xcp v0.3.4 - by Que's C++ Studio 2020-01-16\n");
+	printf("description: cp with progress\n");
 	printf("\n");
 	printf("synopsis: xcp [OPTIONS] src1 [src2 ... srcn] dest\n");
 	printf("\n");
 	printf("[OPTIONS]\n");
 	printf("-r: recusive copy sub directories\n");
 	printf("-f: force overwrite without prompt\n");
-	printf("-q: quiet no warning/error message\n");
-	printf("-d: dry run, print commands only\n");
-	printf("-v: show verbos message\n");
-	printf("-h: show usage message\n");
+	printf("-q: quiet mode\n");
+	printf("-d: dry run\n");
+	printf("-v: print verbos message\n");
+	printf("-h: print usage message\n");
+	printf("\n");
 }
 
 /*主函数，做两次遍历*/
-int main(int argc, char *args[]) {
+int main(int argc, char *args[])
+{
 	int i = 0;
 	char path_from[MAX_PATH_LENGTH];
 	char path_to[MAX_PATH_LENGTH];
@@ -514,30 +529,30 @@ int main(int argc, char *args[]) {
 
 	while ((opt = getopt(argc, args, "rfqdhv")) != -1) {
 		switch(opt) {
-			case 'r':
-				g_opt_r = 1;
-				break;
-			case 'f':
-				g_opt_f = 1;
-				break;
-			case 'q':
-				g_opt_q = 1;
-				break;
-			case 'd':
-				g_opt_d = 1;
-				break;
-			case 'h':
-				help = 1;
-				break;
-			case 'v':
-				g_opt_v = 1;
-				break;
-			case '?':
-				printf("unknown option: %c\n", optopt);
-				help = 1;
-				break;
-			default:
-				break;
+		case 'r':
+			g_opt_r = 1;
+			break;
+		case 'f':
+			g_opt_f = 1;
+			break;
+		case 'q':
+			g_opt_q = 1;
+			break;
+		case 'd':
+			g_opt_d = 1;
+			break;
+		case 'h':
+			help = 1;
+			break;
+		case 'v':
+			g_opt_v = 1;
+			break;
+		case '?':
+			printf("unknown option: %c\n", optopt);
+			help = 1;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -576,11 +591,7 @@ int main(int argc, char *args[]) {
 	for (i = optind; i < argc - 1; ++i) {
 		strcpy(path_from, args[i]);
 		strcpy(path_to, args[argc - 1]);
-		if (g_opt_d) {
-			if (OP_CANCEL == walk(0, path_from, path_to, dry_run)) break;
-		} else {
-			if (OP_CANCEL == walk(0, path_from, path_to, copy)) break;
-		}
+		if (OP_CANCEL == walk(0, path_from, path_to, copy)) break;
 	}
 
 	install_timer(0, NULL);
