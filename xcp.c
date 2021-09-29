@@ -55,6 +55,9 @@
 * 2020-01-16
 * v0.3.4 只在扫描阶段提示 -r 选项 
 * 取消 dry_run() 合并入 copy()
+*
+* 2021-9-29
+* v0.3.5 add to github
 */
 
 #define MAX_FMTSTR_LENGTH			2048/*传递给print_message函数的格式字符串最大长度*/
@@ -502,7 +505,7 @@ static int copy(const char* src, const char* dest, const struct stat *src_st, co
 /*使用说明*/
 static void usage()
 {
-	printf("xcp v0.3.4 - by Que's C++ Studio 2020-01-16\n");
+	printf("xcp v0.3.5 - by Que's C++ Studio 2020-01-16\n");
 	printf("description: cp with progress\n");
 	printf("\n");
 	printf("synopsis: xcp [OPTIONS] src1 [src2 ... srcn] dest\n");
