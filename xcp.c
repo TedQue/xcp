@@ -14,52 +14,6 @@
 #include <errno.h>
 #include <assert.h>
 
-/*
-* 复制文件可以显示进度
-*
-* 两个思路:遍历文件一次，把文件名记录在一个列表，后续操作直接从列表中得到文件名
-* 或者遍历两遍，第一次统计，第二次执行
-*
-* 关于进度条
-* 1. 用定时器每隔1秒刷新一次要注意函数重入的问题
-* 2. 两个线程工作线程统计/拷贝主线程刷新状态，似乎小题大做了
-* 3. 一个线程有变化时刷新，这样就无法现实动画
-*
-* 2013-10-22
-* 1. 添加命令行选项的处理。
-* 2. 添加文件无法访问/目录无法创建或者文件/目录已经存在的情况的处理。
-* 3. 如果没有任何文件成功复制时的提示信息BUG（在有文件detected的情况下）。
-* 4. 复制文件，目标是已经存在的目录名时自动添加文件名而不是直接复制。
-* 5. 结束时用human_time 来显示用去的时间。
-*
-* 2013-10-23
-* 1. 统计阶段也要显示动画
-*
-* 2013-10-24
-* 1. overwrite 提示后等待用户输入和定时器冲突的问题
-*
-* 2013-10-29
- 1. 多源拷贝在主函数做个循环，都要补齐文件名，判断是否存在等.
-*
-* 2020-1-10
-* v0.2 重写整个程序
-* 1. 使之符合 cp 命令的习惯
-* 2. 遵循 linux 编码风格
-*
-* 2020-1-11
-* v0.3 添加覆盖时 yes/no to all 选项
-* v0.3.1 细节修订
-* v0.3.2 细节修订
-* v0.3.3 代码格式修订
-*
-* 2020-01-16
-* v0.3.4 只在扫描阶段提示 -r 选项 
-* 取消 dry_run() 合并入 copy()
-*
-* 2021-9-29
-* v0.3.5 add to github
-*/
-
 #define MAX_FMTSTR_LENGTH			2048/*传递给print_message函数的格式字符串最大长度*/
 #define COPY_BUF_SIZE				4096 /*复制文件时每次读取的长度*/
 #define MAX_PATH_LENGTH				(PATH_MAX + 1)/*路径的最大长度*/
@@ -76,6 +30,8 @@
 #define MSGT_WARNING				1
 #define MSGT_ERROR					2
 #define MSGT_VERBOSE				3
+
+const char *g_version = "0.3.6";
 
 /*启用大文件支持*/
 //#define _LARGEFILE64_SOURCE
@@ -505,7 +461,7 @@ static int copy(const char* src, const char* dest, const struct stat *src_st, co
 /*使用说明*/
 static void usage()
 {
-	printf("xcp v0.3.5 - by Que's C++ Studio 2020-01-16\n");
+	printf("xcp v%s - by Que's C++ Studio 2020-01-16\n", g_version);
 	printf("description: cp with progress\n");
 	printf("\n");
 	printf("synopsis: xcp [OPTIONS] src1 [src2 ... srcn] dest\n");
